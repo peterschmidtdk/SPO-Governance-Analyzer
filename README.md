@@ -67,8 +67,6 @@ whichever fits how you're running it:
 | `Invoke-SPOGovernanceAnalyzer.ps1` | App Registration (certificate), non-interactive | Requires `config.json` (see Configuration below) |
 | `Invoke-SPOGovernanceAnalyzer-Interactive.ps1` | Interactive (browser), sign in with your own SharePoint Admin account | None — no `config.json`. Needs a one-time per-tenant app registration (see below) |
 
-- `Get-SPOSiteRCDAndSensitivityLabel.ps1` still prompts for `[1] App Registration` / `[2] Interactive` at startup (unrelated to this split).
-- `Test-SPOSiteLabel.ps1` uses App Registration by default; pass `-Interactive` to sign in via browser instead.
 - Interactive mode is best for ad-hoc/manual runs; App Registration is better for unattended/scheduled runs since it doesn't need a signed-in user.
 
 ### First-time interactive sign-in in a new tenant
