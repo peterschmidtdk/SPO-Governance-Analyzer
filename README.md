@@ -99,6 +99,7 @@ the cached app with no further prompt, and only needs the SharePoint Administrat
   - `Microsoft Graph > Sites.Read.All`
   - `Microsoft Graph > User.Read.All`
   - `Microsoft Graph > InformationProtectionPolicy.Read.All` — sensitivity label name lookup
+  - `Microsoft Graph > Group.Read.All` — only needed for the optional security-group expansion prompt
   - **Certificate** installed in the Windows certificate store (thumbprint in config)
 - **For Interactive (browser) mode** (`Invoke-SPOGovernanceAnalyzer-Interactive.ps1`) — a SharePoint Admin account, plus Application Developer or Global Administrator once per tenant to register the sign-in app (see Authentication Modes above)
 
@@ -153,9 +154,11 @@ HTML report's expandable per-site permission table.
 - **One level deep** — a member that is itself a group is listed but not recursed into, to
   keep cost and runtime bounded.
 - **Cached per run** — each group is resolved once even if referenced from many sites.
-- **No extra Graph permission needed** — reuses the `User.Read.All` scope already granted
-  for App Registration mode; interactive mode's per-tenant sign-in app requests the
-  delegated equivalent automatically.
+- **Requires `Group.Read.All`** — App Registration mode needs this Graph permission (re-run
+  `Setup-SPOGovernanceAnalyzer-AppRegistration.ps1` v1.0.5+ once to add it to an existing
+  registration); interactive mode's per-tenant sign-in app requests the delegated equivalent
+  automatically (re-register — delete the app's cache file — if you registered it before
+  v1.0.3 of the interactive script).
 - **Off by default** — it adds one Graph call per unique group found, which adds real scan
   time on tenants with heavy group-based permissioning.
 
@@ -189,6 +192,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.32 | 2026-08-04 | Fixed security-group expansion (v1.0.31): `Get-PnPEntraIDGroupMember` returned `403 Forbidden` for every group on first live use — `User.Read.All` was not actually sufficient despite PnP's docs listing it as one of several acceptable scopes. Added the correctly-scoped `Group.Read.All` permission. |
 | v1.0.31 | 2026-08-04 | Added an opt-in "Expand security group membership?" prompt — see Security Group Expansion above. |
 | v1.0.30 | 2026-08-03 | Fixed two real-tenant runtime errors: `Get-PnPAccessToken -ResourceTypeName MSGraph` (invalid — corrected to `Graph`) and `Get-PnPSensitivityLabel` (never shipped as a stable cmdlet — replaced with `Get-PnPAvailableSensitivityLabel`, which needs the new `InformationProtectionPolicy.Read.All` Graph permission below). |
 | v1.0.29 | 2026-08-03 | Removed the `../SPO-SiteInventory/config/config.json` sibling-tool config fallback — that tool is a separate, non-public project not distributed with this repo. Same cleanup applied to `Get-SPOSiteRCDAndSensitivityLabel.ps1`, `Test-SPOSiteLabel.ps1` and `Setup-SPOGovernanceAnalyzer-AppRegistration.ps1`. |
@@ -200,6 +204,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.3 | 2026-08-04 | Same `Group.Read.All` fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.32 — added to the per-tenant sign-in app's requested delegated permissions. Re-register (delete the app's cache file) if you registered it before this version. |
 | v1.0.2 | 2026-08-04 | Same "Expand security group membership?" prompt as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.31 — see Security Group Expansion above. |
 | v1.0.1 | 2026-08-03 | Same cmdlet fixes as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.30, plus the per-tenant sign-in app now requests Graph delegated permissions (`Reports.Read.All`, `Sites.Read.All`, `User.Read.All`, `InformationProtectionPolicy.Read`) — it previously requested none, so Graph usage data and label names would have failed silently even after the cmdlet fixes. If you registered the sign-in app before this version, delete its cache file so it re-registers with the new scopes. |
 | v1.0.0 | 2026-08-03 | New script, split out of `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.27. Same report and scan logic; interactive (browser) sign-in only, via a per-tenant Entra ID app registered through `Register-PnPEntraIDAppForInteractiveLogin`. |

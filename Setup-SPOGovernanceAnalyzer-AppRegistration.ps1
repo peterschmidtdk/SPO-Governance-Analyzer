@@ -30,12 +30,20 @@
       - Microsoft Graph > Sites.Read.All
       - Microsoft Graph > User.Read.All
       - Microsoft Graph > InformationProtectionPolicy.Read.All
+      - Microsoft Graph > Group.Read.All
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.4
+    Version : v1.0.5
 
 .CHANGELOG
+    v1.0.5 - 2026-08-04 - Added Microsoft Graph > Group.Read.All — required by
+             Get-PnPEntraIDGroupMember (the optional security-group-expansion feature in
+             the two Invoke- scripts). Confirmed via a real 403 Forbidden on first live use:
+             User.Read.All alone does not authorize reading another group's membership,
+             despite PnP's own docs listing it as one of several sufficient scopes. Existing
+             App Registrations: re-run this script once to add and consent the new
+             permission — the ClientId/certificate are untouched.
     v1.0.4 - 2026-08-03 - Added Microsoft Graph > InformationProtectionPolicy.Read.All —
              required by Get-PnPAvailableSensitivityLabel (the tenant sensitivity label
              cache used by all three governance scripts). Without it, label names resolve
@@ -185,12 +193,14 @@ $idSitesRead   = Get-RoleId $graphSp 'Sites.Read.All'
 $idReportsRead = Get-RoleId $graphSp 'Reports.Read.All'
 $idUserRead    = Get-RoleId $graphSp 'User.Read.All'
 $idInfoProtRead= Get-RoleId $graphSp 'InformationProtectionPolicy.Read.All'
+$idGroupRead   = Get-RoleId $graphSp 'Group.Read.All'
 $idSitesFull   = Get-RoleId $spSp    'Sites.FullControl.All'
 
 Write-Host "  Sites.Read.All                        : $idSitesRead"    -ForegroundColor Gray
 Write-Host "  Reports.Read.All                      : $idReportsRead"  -ForegroundColor Gray
 Write-Host "  User.Read.All                         : $idUserRead"     -ForegroundColor Gray
 Write-Host "  InformationProtectionPolicy.Read.All  : $idInfoProtRead" -ForegroundColor Gray
+Write-Host "  Group.Read.All                        : $idGroupRead"    -ForegroundColor Gray
 Write-Host "  Sites.FullControl.All                 : $idSitesFull"    -ForegroundColor Gray
 Write-Host "  [OK] Permission IDs resolved" -ForegroundColor Green
 Write-Host ""
@@ -219,6 +229,7 @@ $requiredAccess = @(
             @{ Id = $idReportsRead;  Type = "Role" }
             @{ Id = $idUserRead;     Type = "Role" }
             @{ Id = $idInfoProtRead; Type = "Role" }
+            @{ Id = $idGroupRead;    Type = "Role" }
         )
     }
     @{
@@ -274,6 +285,7 @@ $permsToGrant = @(
     @{ ResourceSp = $graphSp; RoleId = $idReportsRead;  Name = 'Reports.Read.All' }
     @{ ResourceSp = $graphSp; RoleId = $idUserRead;     Name = 'User.Read.All' }
     @{ ResourceSp = $graphSp; RoleId = $idInfoProtRead; Name = 'InformationProtectionPolicy.Read.All' }
+    @{ ResourceSp = $graphSp; RoleId = $idGroupRead;    Name = 'Group.Read.All' }
     @{ ResourceSp = $spSp;    RoleId = $idSitesFull;    Name = 'Sites.FullControl.All' }
 )
 

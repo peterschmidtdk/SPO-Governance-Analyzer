@@ -12,7 +12,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.31
+    Version : v1.0.32
     Requires: PnP.PowerShell 2.x+
     Auth    : App-only certificate only. For interactive browser sign-in, use
               Invoke-SPOGovernanceAnalyzer-Interactive.ps1 instead — this script now
@@ -23,11 +23,19 @@
               Required keys: TenantId, ClientId, CertificateThumbprint
     Perms   : SharePoint > Sites.FullControl.All (application)
               Microsoft Graph > Reports.Read.All, Sites.Read.All, User.Read.All,
-                                InformationProtectionPolicy.Read.All
-              (User.Read.All also covers the optional security-group expansion below —
-              no extra Graph permission needed for it.)
+                                InformationProtectionPolicy.Read.All, Group.Read.All
+              (Group.Read.All is only needed for the optional security-group expansion
+              prompt — re-run Setup-SPOGovernanceAnalyzer-AppRegistration.ps1 v1.0.5+ once
+              to grant it on an existing App Registration.)
 
 .CHANGELOG
+    v1.0.32 - 2026-08-04 - Fixed security-group expansion (v1.0.31) silently finding nothing:
+              Get-PnPEntraIDGroupMember returned "403 Forbidden" for every group on first
+              live use. PnP's own docs list User.Read.All as one of several sufficient Graph
+              scopes for that cmdlet, but that did not hold in practice — added the
+              correctly-scoped Group.Read.All permission, both here and to
+              Setup-SPOGovernanceAnalyzer-AppRegistration.ps1 (v1.0.5+; re-run it once on an
+              existing App Registration to grant the new permission).
     v1.0.31 - 2026-08-04 - Added an opt-in "Expand security group membership?" prompt.
               When a site permission (site admin or SharePoint group member) turns out to
               be an Entra ID security group rather than a user, this resolves that group's
@@ -91,7 +99,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.31'
+$ScriptVersion = 'v1.0.32'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state

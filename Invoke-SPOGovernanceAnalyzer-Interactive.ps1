@@ -14,7 +14,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.2
+    Version : v1.0.3
     Requires: PnP.PowerShell 2.x+
     Auth    : Interactive browser sign-in only. For unattended/scheduled runs with an App
               Registration and certificate, use Invoke-SPOGovernanceAnalyzer.ps1 instead.
@@ -23,16 +23,23 @@
               %USERPROFILE%\.spo-tools\interactive-<tenant>.json for later runs. Registering
               it requires the Application Developer or Global Administrator role; every run
               after that only needs the SharePoint Administrator role.
-              If you registered the sign-in app before v1.0.1, delete its cache file
+              If you registered the sign-in app before v1.0.3, delete its cache file
               (%USERPROFILE%\.spo-tools\interactive-<tenant>.json) once so it re-registers
               with the Graph permissions below — the old cached app predates them.
     Perms   : SharePoint > Sites.FullControl.All (delegated, via the per-tenant app above)
               Microsoft Graph > Reports.Read.All, Sites.Read.All, User.Read.All,
-                                InformationProtectionPolicy.Read (all delegated)
-              (User.Read.All also covers the optional security-group expansion below —
-              no extra Graph scope needed for it.)
+                                InformationProtectionPolicy.Read, Group.Read.All (all delegated)
+              (Group.Read.All is only needed for the optional security-group expansion
+              prompt.)
 
 .CHANGELOG
+    v1.0.3 - 2026-08-04 - Fixed security-group expansion (v1.0.2) silently finding nothing:
+              Get-PnPEntraIDGroupMember returned "403 Forbidden" for every group on first
+              live use — User.Read.All alone was not sufficient despite PnP's own docs
+              listing it as one of several sufficient scopes. Added Group.Read.All to the
+              -GraphDelegatePermissions requested at sign-in-app registration. If you
+              registered the app before this version, delete its cache file so it
+              re-registers with the new scope.
     v1.0.2 - 2026-08-04 - Added the same opt-in "Expand security group membership?" prompt
               as Invoke-SPOGovernanceAnalyzer.ps1 v1.0.31 — resolves Entra ID security
               groups found in site permissions to their direct members via
@@ -58,7 +65,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.2'
+$ScriptVersion = 'v1.0.3'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -112,7 +119,7 @@ function Get-InteractiveClientId {
     try {
         $appReg = Register-PnPEntraIDAppForInteractiveLogin -ApplicationName 'SPO Governance Analyzer' `
             -Tenant "$TenantNameHint.onmicrosoft.com" -SharePointDelegatePermissions 'AllSites.FullControl' `
-            -GraphDelegatePermissions 'Reports.Read.All','Sites.Read.All','User.Read.All','InformationProtectionPolicy.Read' -ErrorAction Stop
+            -GraphDelegatePermissions 'Reports.Read.All','Sites.Read.All','User.Read.All','InformationProtectionPolicy.Read','Group.Read.All' -ErrorAction Stop
     } catch {
         throw "Register-PnPEntraIDAppForInteractiveLogin failed: $($_.Exception.Message). If the command isn't recognized, update the module: Update-Module PnP.PowerShell -Force"
     }
