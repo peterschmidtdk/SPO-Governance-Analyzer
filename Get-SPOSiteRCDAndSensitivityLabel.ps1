@@ -14,7 +14,7 @@
     RestrictContentOrgWideSearch and SensitivityLabel (PnP bug #5034 / #3356).
     This script always uses -Identity <url> -Detailed for reliable results.
 
-    Label GUIDs are resolved to display names via Get-PnPSensitivityLabel.
+    Label GUIDs are resolved to display names via Get-PnPAvailableSensitivityLabel.
     Sites without a label show "No Label" — never blank, never $null.
 
     RCD NOTE:
@@ -70,9 +70,15 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.2
+    Version : v1.0.3
 
 .CHANGELOG
+    v1.0.3 - 2026-08-03 - Get-PnPSensitivityLabel never shipped as a stable cmdlet (only ever
+              existed in nightly builds); replaced with the real cmdlet,
+              Get-PnPAvailableSensitivityLabel. That cmdlet requires the Microsoft Graph
+              InformationProtectionPolicy.Read.All (application) / .Read (delegated)
+              permission — grant it via Setup-SPOGovernanceAnalyzer-AppRegistration.ps1 v1.0.4+
+              for App Registration mode.
     v1.0.2 - 2026-08-03 - Removed the ../SPO-SiteInventory/config/config.json sibling-tool
               fallback from the config search order — that tool is a separate, non-public
               project not distributed with this repo.
@@ -102,7 +108,7 @@ $ErrorActionPreference = 'Stop'
 $Script:RunStart = Get-Date
 
 # Single source of truth for the version string shown in the console banner and HTML footer.
-$ScriptVersion = 'v1.0.2'
+$ScriptVersion = 'v1.0.3'
 
 # Single source of truth for the shared "PnP Management Shell" multi-tenant app used by
 # interactive (browser) sign-in — see Connect-RCDSite / Repair-PnPManagementShellConsent.
@@ -266,7 +272,7 @@ try {
 
 $labelMap = @{}
 try {
-    Get-PnPSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
+    Get-PnPAvailableSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
         $labelMap[$_.Id.ToString().ToLower()] = $_.Name
     }
     if ($labelMap.Count -gt 0) {

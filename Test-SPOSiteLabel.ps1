@@ -32,9 +32,16 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.3
+    Version : v1.0.4
 
 .CHANGELOG
+    v1.0.4 - 2026-08-03 - Get-PnPSensitivityLabel never shipped as a stable cmdlet (only ever
+                          existed in nightly builds); replaced with the real cmdlet,
+                          Get-PnPAvailableSensitivityLabel. That cmdlet requires the Microsoft
+                          Graph InformationProtectionPolicy.Read.All (application) / .Read
+                          (delegated) permission — grant it via
+                          Setup-SPOGovernanceAnalyzer-AppRegistration.ps1 v1.0.4+ for
+                          App Registration mode.
     v1.0.3 - 2026-08-03 - Removed the ../SPO-SiteInventory/config/config.json sibling-tool
                           fallback from the config search order — that tool is a separate,
                           non-public project not distributed with this repo.
@@ -173,7 +180,7 @@ try {
 
 $labelMap = @{}
 try {
-    Get-PnPSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
+    Get-PnPAvailableSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
         $labelMap[$_.Id.ToString().ToLower()] = $_.Name
     }
 } catch {

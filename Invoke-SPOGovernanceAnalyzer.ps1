@@ -12,7 +12,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.29
+    Version : v1.0.30
     Requires: PnP.PowerShell 2.x+
     Auth    : App-only certificate only. For interactive browser sign-in, use
               Invoke-SPOGovernanceAnalyzer-Interactive.ps1 instead — this script now
@@ -22,9 +22,18 @@
                 2. <script folder>\config\config.json      (local, created by Setup-SPOGovernanceAnalyzer-AppRegistration.ps1)
               Required keys: TenantId, ClientId, CertificateThumbprint
     Perms   : SharePoint > Sites.FullControl.All (application)
-              Microsoft Graph > Reports.Read.All, Sites.Read.All, User.Read.All
+              Microsoft Graph > Reports.Read.All, Sites.Read.All, User.Read.All,
+                                InformationProtectionPolicy.Read.All
 
 .CHANGELOG
+    v1.0.30 - 2026-08-03 - Fixed two real-tenant runtime errors reported after first live run:
+              (1) Get-PnPAccessToken -ResourceTypeName MSGraph — MSGraph is not a valid
+              PnP.PowerShell ResourceTypeName; corrected to Graph. (2) Get-PnPSensitivityLabel
+              does not exist as a shipped cmdlet (it never left nightly builds); replaced with
+              the actual stable cmdlet, Get-PnPAvailableSensitivityLabel, which additionally
+              requires the Microsoft Graph InformationProtectionPolicy.Read.All permission —
+              added to Setup-SPOGovernanceAnalyzer-AppRegistration.ps1 (re-run it once on
+              existing App Registrations to grant the new permission).
     v1.0.29 - 2026-08-03 - Removed the ../SPO-SiteInventory/config/config.json sibling-tool
               fallback from the config search order — that tool is a separate, non-public
               project not distributed with this repo, so the fallback path never resolved
@@ -72,7 +81,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.29'
+$ScriptVersion = 'v1.0.30'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -1369,7 +1378,7 @@ Write-Host "  Sites to scan: $($sites.Count)" -ForegroundColor Green
 # ── Sensitivity label name cache ──────────────────────────────────────────────
 $labelMap = @{}
 try {
-    Get-PnPSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
+    Get-PnPAvailableSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
         $labelMap[$_.Id.ToString().ToLower()] = $_.Name
     }
     if ($labelMap.Count -gt 0) { Write-Host "  Sensitivity labels cached: $($labelMap.Count)" -ForegroundColor Green }
@@ -1382,7 +1391,7 @@ Write-Host '  Fetching Graph usage report (last 180 days)...' -ForegroundColor C
 $usageMap = @{}
 try {
     # Get-PnPAccessToken avoids the assembly-cache conflict that affects Get-PnPGraphAccessToken
-    $graphToken = Get-PnPAccessToken -ResourceTypeName MSGraph -Connection $adminConn
+    $graphToken = Get-PnPAccessToken -ResourceTypeName Graph -Connection $adminConn
     $reportUrl  = 'https://graph.microsoft.com/v1.0/reports/getSharePointSiteUsageDetail(period=''D180'')'
     $req = [System.Net.HttpWebRequest]::Create($reportUrl)
     $req.Method = 'GET'

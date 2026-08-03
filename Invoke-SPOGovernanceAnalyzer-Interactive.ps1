@@ -14,7 +14,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.0
+    Version : v1.0.1
     Requires: PnP.PowerShell 2.x+
     Auth    : Interactive browser sign-in only. For unattended/scheduled runs with an App
               Registration and certificate, use Invoke-SPOGovernanceAnalyzer.ps1 instead.
@@ -23,10 +23,22 @@
               %USERPROFILE%\.spo-tools\interactive-<tenant>.json for later runs. Registering
               it requires the Application Developer or Global Administrator role; every run
               after that only needs the SharePoint Administrator role.
+              If you registered the sign-in app before v1.0.1, delete its cache file
+              (%USERPROFILE%\.spo-tools\interactive-<tenant>.json) once so it re-registers
+              with the Graph permissions below — the old cached app predates them.
     Perms   : SharePoint > Sites.FullControl.All (delegated, via the per-tenant app above)
-              Microsoft Graph > Reports.Read.All, Sites.Read.All, User.Read.All
+              Microsoft Graph > Reports.Read.All, Sites.Read.All, User.Read.All,
+                                InformationProtectionPolicy.Read (all delegated)
 
 .CHANGELOG
+    v1.0.1 - 2026-08-03 - Fixed two real-tenant runtime errors also found in the App
+              Registration script: (1) Get-PnPAccessToken -ResourceTypeName MSGraph is
+              invalid; corrected to Graph. (2) Get-PnPSensitivityLabel never shipped as a
+              stable cmdlet; replaced with Get-PnPAvailableSensitivityLabel. That cmdlet
+              needs Graph permissions the per-tenant sign-in app never requested — added
+              -GraphDelegatePermissions (Reports.Read.All, Sites.Read.All, User.Read.All,
+              InformationProtectionPolicy.Read) to the Register-PnPEntraIDAppForInteractiveLogin
+              call in Get-InteractiveClientId.
     v1.0.0 - 2026-08-03 - Split out of Invoke-SPOGovernanceAnalyzer.ps1 v1.0.27 as a dedicated
               interactive-only entry point. Fixes interactive sign-in, which was broken in the
               combined script: the connect-failure handler called a never-defined
@@ -40,7 +52,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.0'
+$ScriptVersion = 'v1.0.1'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -93,7 +105,8 @@ function Get-InteractiveClientId {
     $appReg = $null
     try {
         $appReg = Register-PnPEntraIDAppForInteractiveLogin -ApplicationName 'SPO Governance Analyzer' `
-            -Tenant "$TenantNameHint.onmicrosoft.com" -SharePointDelegatePermissions 'AllSites.FullControl' -ErrorAction Stop
+            -Tenant "$TenantNameHint.onmicrosoft.com" -SharePointDelegatePermissions 'AllSites.FullControl' `
+            -GraphDelegatePermissions 'Reports.Read.All','Sites.Read.All','User.Read.All','InformationProtectionPolicy.Read' -ErrorAction Stop
     } catch {
         throw "Register-PnPEntraIDAppForInteractiveLogin failed: $($_.Exception.Message). If the command isn't recognized, update the module: Update-Module PnP.PowerShell -Force"
     }
@@ -1384,7 +1397,7 @@ Write-Host "  Sites to scan: $($sites.Count)" -ForegroundColor Green
 # ── Sensitivity label name cache ──────────────────────────────────────────────
 $labelMap = @{}
 try {
-    Get-PnPSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
+    Get-PnPAvailableSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
         $labelMap[$_.Id.ToString().ToLower()] = $_.Name
     }
     if ($labelMap.Count -gt 0) { Write-Host "  Sensitivity labels cached: $($labelMap.Count)" -ForegroundColor Green }
@@ -1397,7 +1410,7 @@ Write-Host '  Fetching Graph usage report (last 180 days)...' -ForegroundColor C
 $usageMap = @{}
 try {
     # Get-PnPAccessToken avoids the assembly-cache conflict that affects Get-PnPGraphAccessToken
-    $graphToken = Get-PnPAccessToken -ResourceTypeName MSGraph -Connection $adminConn
+    $graphToken = Get-PnPAccessToken -ResourceTypeName Graph -Connection $adminConn
     $reportUrl  = 'https://graph.microsoft.com/v1.0/reports/getSharePointSiteUsageDetail(period=''D180'')'
     $req = [System.Net.HttpWebRequest]::Create($reportUrl)
     $req.Method = 'GET'

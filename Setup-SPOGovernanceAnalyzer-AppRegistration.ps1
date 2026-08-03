@@ -29,12 +29,19 @@
       - Microsoft Graph > Reports.Read.All
       - Microsoft Graph > Sites.Read.All
       - Microsoft Graph > User.Read.All
+      - Microsoft Graph > InformationProtectionPolicy.Read.All
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.3
+    Version : v1.0.4
 
 .CHANGELOG
+    v1.0.4 - 2026-08-03 - Added Microsoft Graph > InformationProtectionPolicy.Read.All —
+             required by Get-PnPAvailableSensitivityLabel (the tenant sensitivity label
+             cache used by all three governance scripts). Without it, label names resolve
+             as "non-fatal" failures and reports fall back to showing label GUIDs. Existing
+             App Registrations: re-run this script once to add and consent the new
+             permission — the ClientId/certificate are untouched.
     v1.0.3 - 2026-08-03 - Removed the note about reusing SPO-SiteInventory's config.json —
              that tool is a separate, non-public project not distributed with this repo.
     v1.0.2 - Initial tracked release — self-signed cert generation, re-run-safe App Registration create/update, programmatic admin consent, config.json output
@@ -177,12 +184,14 @@ function Get-RoleId($sp, $roleName) {
 $idSitesRead   = Get-RoleId $graphSp 'Sites.Read.All'
 $idReportsRead = Get-RoleId $graphSp 'Reports.Read.All'
 $idUserRead    = Get-RoleId $graphSp 'User.Read.All'
+$idInfoProtRead= Get-RoleId $graphSp 'InformationProtectionPolicy.Read.All'
 $idSitesFull   = Get-RoleId $spSp    'Sites.FullControl.All'
 
-Write-Host "  Sites.Read.All        : $idSitesRead"   -ForegroundColor Gray
-Write-Host "  Reports.Read.All      : $idReportsRead"  -ForegroundColor Gray
-Write-Host "  User.Read.All         : $idUserRead"     -ForegroundColor Gray
-Write-Host "  Sites.FullControl.All : $idSitesFull"    -ForegroundColor Gray
+Write-Host "  Sites.Read.All                        : $idSitesRead"    -ForegroundColor Gray
+Write-Host "  Reports.Read.All                      : $idReportsRead"  -ForegroundColor Gray
+Write-Host "  User.Read.All                         : $idUserRead"     -ForegroundColor Gray
+Write-Host "  InformationProtectionPolicy.Read.All  : $idInfoProtRead" -ForegroundColor Gray
+Write-Host "  Sites.FullControl.All                 : $idSitesFull"    -ForegroundColor Gray
 Write-Host "  [OK] Permission IDs resolved" -ForegroundColor Green
 Write-Host ""
 
@@ -206,9 +215,10 @@ $requiredAccess = @(
     @{
         ResourceAppId  = "00000003-0000-0000-c000-000000000000"
         ResourceAccess = @(
-            @{ Id = $idSitesRead;   Type = "Role" }
-            @{ Id = $idReportsRead; Type = "Role" }
-            @{ Id = $idUserRead;    Type = "Role" }
+            @{ Id = $idSitesRead;    Type = "Role" }
+            @{ Id = $idReportsRead;  Type = "Role" }
+            @{ Id = $idUserRead;     Type = "Role" }
+            @{ Id = $idInfoProtRead; Type = "Role" }
         )
     }
     @{
@@ -260,10 +270,11 @@ Write-Host "  Granting admin consent..." -ForegroundColor Yellow
 
 $grantErrors  = 0
 $permsToGrant = @(
-    @{ ResourceSp = $graphSp; RoleId = $idSitesRead;   Name = 'Sites.Read.All' }
-    @{ ResourceSp = $graphSp; RoleId = $idReportsRead; Name = 'Reports.Read.All' }
-    @{ ResourceSp = $graphSp; RoleId = $idUserRead;    Name = 'User.Read.All' }
-    @{ ResourceSp = $spSp;    RoleId = $idSitesFull;   Name = 'Sites.FullControl.All' }
+    @{ ResourceSp = $graphSp; RoleId = $idSitesRead;    Name = 'Sites.Read.All' }
+    @{ ResourceSp = $graphSp; RoleId = $idReportsRead;  Name = 'Reports.Read.All' }
+    @{ ResourceSp = $graphSp; RoleId = $idUserRead;     Name = 'User.Read.All' }
+    @{ ResourceSp = $graphSp; RoleId = $idInfoProtRead; Name = 'InformationProtectionPolicy.Read.All' }
+    @{ ResourceSp = $spSp;    RoleId = $idSitesFull;    Name = 'Sites.FullControl.All' }
 )
 
 foreach ($perm in $permsToGrant) {

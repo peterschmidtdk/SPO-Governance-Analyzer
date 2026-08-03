@@ -99,6 +99,7 @@ the cached app with no further prompt, and only needs the SharePoint Administrat
   - `Microsoft Graph > Reports.Read.All`
   - `Microsoft Graph > Sites.Read.All`
   - `Microsoft Graph > User.Read.All`
+  - `Microsoft Graph > InformationProtectionPolicy.Read.All` — sensitivity label name lookup
   - **Certificate** installed in the Windows certificate store (thumbprint in config)
 - **For Interactive (browser) mode** (`Invoke-SPOGovernanceAnalyzer-Interactive.ps1`) — a SharePoint Admin account, plus Application Developer or Global Administrator once per tenant to register the sign-in app (see Authentication Modes above)
 
@@ -167,6 +168,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.30 | 2026-08-03 | Fixed two real-tenant runtime errors: `Get-PnPAccessToken -ResourceTypeName MSGraph` (invalid — corrected to `Graph`) and `Get-PnPSensitivityLabel` (never shipped as a stable cmdlet — replaced with `Get-PnPAvailableSensitivityLabel`, which needs the new `InformationProtectionPolicy.Read.All` Graph permission below). |
 | v1.0.29 | 2026-08-03 | Removed the `../SPO-SiteInventory/config/config.json` sibling-tool config fallback — that tool is a separate, non-public project not distributed with this repo. Same cleanup applied to `Get-SPOSiteRCDAndSensitivityLabel.ps1`, `Test-SPOSiteLabel.ps1` and `Setup-SPOGovernanceAnalyzer-AppRegistration.ps1`. |
 | v1.0.28 | 2026-08-03 | Split interactive (browser) sign-in out into `Invoke-SPOGovernanceAnalyzer-Interactive.ps1`. This script is now App Registration (certificate) only — `config.json` required up front, `[1]/[2]` auth-mode picker removed. Also fixes a live bug: the connect-failure handler called a never-defined `Repair-PnPManagementShellConsent` function, masking real connection errors in interactive mode. Console banner and prompts refreshed. |
 | v1.0.25 | 2026-08-03 | Added 'Unknown' Copilot Readiness tier for sites whose scan failed (previously silently reported as 'OK'); wired up sparkline/change-badge history rendering in the HTML KPI cards; fixed stale `config-appreg.ps1` references; fixed HTML footer version drift; removed leftover debug console output. See the script's own `.CHANGELOG` for full detail and all prior versions. |
@@ -176,6 +178,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.1 | 2026-08-03 | Same cmdlet fixes as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.30, plus the per-tenant sign-in app now requests Graph delegated permissions (`Reports.Read.All`, `Sites.Read.All`, `User.Read.All`, `InformationProtectionPolicy.Read`) — it previously requested none, so Graph usage data and label names would have failed silently even after the cmdlet fixes. If you registered the sign-in app before this version, delete its cache file so it re-registers with the new scopes. |
 | v1.0.0 | 2026-08-03 | New script, split out of `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.27. Same report and scan logic; interactive (browser) sign-in only, via a per-tenant Entra ID app registered through `Register-PnPEntraIDAppForInteractiveLogin`. |
 
 ---
