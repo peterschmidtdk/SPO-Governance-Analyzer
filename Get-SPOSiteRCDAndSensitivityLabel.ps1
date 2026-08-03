@@ -70,9 +70,12 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.1
+    Version : v1.0.2
 
 .CHANGELOG
+    v1.0.2 - 2026-08-03 - Removed the ../SPO-SiteInventory/config/config.json sibling-tool
+              fallback from the config search order — that tool is a separate, non-public
+              project not distributed with this repo.
     v1.0.1 - 2026-08-03 - Interactive sign-in now detects AADSTS700016 (PnP Management Shell app not yet consented in this tenant — a one-time admin action, not a script bug) and offers to run Register-PnPManagementShellAccess and retry, or shows the manual admin-consent URL; ClientId de-duplicated into a single $PnPMgmtShellClientId constant
     v1.0.0 - 2026-06-26 - Initial release
 #>
@@ -99,7 +102,7 @@ $ErrorActionPreference = 'Stop'
 $Script:RunStart = Get-Date
 
 # Single source of truth for the version string shown in the console banner and HTML footer.
-$ScriptVersion = 'v1.0.1'
+$ScriptVersion = 'v1.0.2'
 
 # Single source of truth for the shared "PnP Management Shell" multi-tenant app used by
 # interactive (browser) sign-in — see Connect-RCDSite / Repair-PnPManagementShellConsent.
@@ -142,8 +145,7 @@ function Invoke-WithRetry {
 
 $configPaths = @(
     (Join-Path $env:USERPROFILE '.spo-tools\config.json'),
-    (Join-Path $PSScriptRoot   'config\config.json'),
-    (Join-Path $PSScriptRoot   '..\SPO-SiteInventory\config\config.json')
+    (Join-Path $PSScriptRoot   'config\config.json')
 )
 $configPath = $configPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 $config = $null

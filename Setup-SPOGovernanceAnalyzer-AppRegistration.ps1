@@ -21,10 +21,6 @@
     Required modules: Microsoft.Graph.Authentication, Microsoft.Graph.Applications
     (Script offers to install them if missing.)
 
-    NOTE: If SPO-SiteInventory is already deployed in the same tenant you can skip
-    this script and copy its config\config.json here instead — both tools share the
-    same app registration and permissions.
-
     The account used for Connect-MgGraph must be Global Admin or a combination of
     Application Administrator + Privileged Role Administrator.
 
@@ -36,9 +32,11 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.2
+    Version : v1.0.3
 
 .CHANGELOG
+    v1.0.3 - 2026-08-03 - Removed the note about reusing SPO-SiteInventory's config.json —
+             that tool is a separate, non-public project not distributed with this repo.
     v1.0.2 - Initial tracked release — self-signed cert generation, re-run-safe App Registration create/update, programmatic admin consent, config.json output
 #>
 

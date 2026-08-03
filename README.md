@@ -8,7 +8,7 @@ A single-pass PowerShell script that combines site inventory (usage, storage, go
 
 ## What it does
 
-The script connects to your SharePoint Online tenant using app-only certificate authentication (same app registration as SPO-SiteInventory), then:
+The script connects to your SharePoint Online tenant using app-only certificate authentication, then:
 
 1. Pulls all site collections (or a scoped subset)
 2. Fetches Graph usage data (last 180 days) for activity, file counts, and page views
@@ -57,32 +57,36 @@ All files land in the `output/` subfolder, timestamped per run:
 
 ## Authentication Modes
 
-Every script in this folder offers two ways to sign in — pick whichever fits at run time, no code changes needed:
+`Invoke-SPOGovernanceAnalyzer.ps1` is now App Registration (certificate) only — the old
+`[1]/[2]` picker is gone, and interactive (browser) sign-in has its own dedicated script,
+`Invoke-SPOGovernanceAnalyzer-Interactive.ps1`. Both produce the identical report; pick
+whichever fits how you're running it:
 
-| Mode | How | Setup |
-|------|-----|-------|
-| **App Registration (certificate)** | Non-interactive, cert-based | Requires `config.json` (see Configuration below) |
-| **Interactive (browser)** | Sign in with your own SharePoint Admin account via the Microsoft-registered PnP Management Shell app | None — no App Registration or config.json required |
+| Script | Mode | Setup |
+|--------|------|-------|
+| `Invoke-SPOGovernanceAnalyzer.ps1` | App Registration (certificate), non-interactive | Requires `config.json` (see Configuration below) |
+| `Invoke-SPOGovernanceAnalyzer-Interactive.ps1` | Interactive (browser), sign in with your own SharePoint Admin account | None — no `config.json`. Needs a one-time per-tenant app registration (see below) |
 
-- `Invoke-SPOGovernanceAnalyzer.ps1` and `Get-SPOSiteRCDAndSensitivityLabel.ps1` prompt for `[1] App Registration` / `[2] Interactive` at startup.
+- `Get-SPOSiteRCDAndSensitivityLabel.ps1` still prompts for `[1] App Registration` / `[2] Interactive` at startup (unrelated to this split).
 - `Test-SPOSiteLabel.ps1` uses App Registration by default; pass `-Interactive` to sign in via browser instead.
-- Interactive mode only needs the SharePoint Admin role — no Azure AD app to create or maintain.
 - Interactive mode is best for ad-hoc/manual runs; App Registration is better for unattended/scheduled runs since it doesn't need a signed-in user.
 
 ### First-time interactive sign-in in a new tenant
 
-Interactive mode uses Microsoft's shared "PnP Management Shell" app (`31359c7f-bd7e-475c-86db-fdb8c937548e`). The **first** time anyone in a given tenant signs in with it, that tenant needs to grant it consent — this is a one-time, tenant-wide step, not something this toolset can skip. If you see:
-
-> `AADSTS700016: Application with identifier '31359c7f-...' was not found in the directory '<tenant-guid>'. ...`
-
-that's this exact situation, not a bug. All three scripts detect this error automatically and offer to fix it for you:
+Microsoft retired the old shared "PnP Management Shell" app in September 2024, so interactive
+sign-in registers a small **per-tenant** Entra ID app the first time it's needed, via PnP.PowerShell's
+[`Register-PnPEntraIDAppForInteractiveLogin`](https://pnp.github.io/powershell/articles/authentication.html):
 
 ```
-Register it now via Register-PnPManagementShellAccess? Requires Global Admin or
-Application Administrator + Privileged Role Administrator [Y/N]
+Interactive sign-in needs a small Entra ID app registered once per tenant.
+Register it now via Register-PnPEntraIDAppForInteractiveLogin? Requires
+Application Developer or Global Administrator role [Y/N]
 ```
 
-Answering `Y` runs [`Register-PnPManagementShellAccess`](https://pnp.github.io/powershell/articles/authentication.html) (a PnP.PowerShell cmdlet that performs the one-time admin consent) and retries the connection automatically. If you'd rather do it yourself, or don't have one of those roles, the script also prints a direct admin-consent URL you can hand to a Global Admin — visiting it once and clicking **Accept** fixes it for every user in the tenant going forward.
+Answering `Y` opens a browser for sign-in + consent, registers the app with
+`AllSites.FullControl` delegated SharePoint permissions, and caches its ClientId at
+`%USERPROFILE%\.spo-tools\interactive-<tenant>.json` — every later run for that tenant reuses
+the cached app with no further prompt, and only needs the SharePoint Administrator role.
 
 ---
 
@@ -96,9 +100,9 @@ Answering `Y` runs [`Register-PnPManagementShellAccess`](https://pnp.github.io/p
   - `Microsoft Graph > Sites.Read.All`
   - `Microsoft Graph > User.Read.All`
   - **Certificate** installed in the Windows certificate store (thumbprint in config)
-- **For Interactive (browser) mode** — just a SharePoint Admin account; no app registration or certificate needed
+- **For Interactive (browser) mode** (`Invoke-SPOGovernanceAnalyzer-Interactive.ps1`) — a SharePoint Admin account, plus Application Developer or Global Administrator once per tenant to register the sign-in app (see Authentication Modes above)
 
-The script shares the same app registration as [SPO-SiteInventory](../SPO-SiteInventory/). If that tool is already configured, no extra setup is needed — the script will automatically use `SPO-SiteInventory\config\config.json` if no local `config\config.json` is present. This only applies to App Registration mode.
+Run `Setup-SPOGovernanceAnalyzer-AppRegistration.ps1` once to create the App Registration and write `config\config.json` automatically.
 
 ---
 
@@ -123,14 +127,15 @@ Create (or reuse) `config\config.json`:
 ## Usage
 
 ```powershell
-.\Invoke-SPOGovernanceAnalyzer.ps1
+.\Invoke-SPOGovernanceAnalyzer.ps1               # App Registration (certificate) — requires config.json
+.\Invoke-SPOGovernanceAnalyzer-Interactive.ps1    # Interactive (browser) — no config.json needed
 ```
 
-The script prompts for:
+Both prompt for:
 - **Inactive threshold** — days before a site is flagged inactive (default: 90)
 - **Scope** — all sites, URL substring filter, or single site URL
 
-No parameters are required; everything is interactive.
+No parameters are required; everything is interactive at the console.
 
 ---
 
@@ -158,11 +163,20 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 ## Version History
 
+**`Invoke-SPOGovernanceAnalyzer.ps1`**
+
 | Version | Date | Notes |
 |---------|------|-------|
-| v1.0.26 | 2026-08-03 | Interactive sign-in now detects AADSTS700016 (PnP Management Shell app not yet consented in this tenant) and offers to run `Register-PnPManagementShellAccess` and retry, or shows the manual admin-consent URL — see "First-time interactive sign-in" above. |
+| v1.0.29 | 2026-08-03 | Removed the `../SPO-SiteInventory/config/config.json` sibling-tool config fallback — that tool is a separate, non-public project not distributed with this repo. Same cleanup applied to `Get-SPOSiteRCDAndSensitivityLabel.ps1`, `Test-SPOSiteLabel.ps1` and `Setup-SPOGovernanceAnalyzer-AppRegistration.ps1`. |
+| v1.0.28 | 2026-08-03 | Split interactive (browser) sign-in out into `Invoke-SPOGovernanceAnalyzer-Interactive.ps1`. This script is now App Registration (certificate) only — `config.json` required up front, `[1]/[2]` auth-mode picker removed. Also fixes a live bug: the connect-failure handler called a never-defined `Repair-PnPManagementShellConsent` function, masking real connection errors in interactive mode. Console banner and prompts refreshed. |
 | v1.0.25 | 2026-08-03 | Added 'Unknown' Copilot Readiness tier for sites whose scan failed (previously silently reported as 'OK'); wired up sparkline/change-badge history rendering in the HTML KPI cards; fixed stale `config-appreg.ps1` references; fixed HTML footer version drift; removed leftover debug console output. See the script's own `.CHANGELOG` for full detail and all prior versions. |
 | v1.0.0 | 2026-06-23 | Initial release — site inventory + permissions merged, 6-tier Copilot Readiness, history.jsonl, dark/light HTML |
+
+**`Invoke-SPOGovernanceAnalyzer-Interactive.ps1`**
+
+| Version | Date | Notes |
+|---------|------|-------|
+| v1.0.0 | 2026-08-03 | New script, split out of `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.27. Same report and scan logic; interactive (browser) sign-in only, via a per-tenant Entra ID app registered through `Register-PnPEntraIDAppForInteractiveLogin`. |
 
 ---
 

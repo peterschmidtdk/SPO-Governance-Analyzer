@@ -32,9 +32,12 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.2
+    Version : v1.0.3
 
 .CHANGELOG
+    v1.0.3 - 2026-08-03 - Removed the ../SPO-SiteInventory/config/config.json sibling-tool
+                          fallback from the config search order — that tool is a separate,
+                          non-public project not distributed with this repo.
     v1.0.2 - 2026-08-03 - Interactive sign-in now detects AADSTS700016 (PnP Management Shell app not
                           yet consented in this tenant — a one-time admin action, not a script bug)
                           and offers to run Register-PnPManagementShellAccess and retry, or shows the
@@ -74,8 +77,7 @@ $configPath = ''
 if (-not $Interactive) {
     $configPaths = @(
         (Join-Path $env:USERPROFILE '.spo-tools\config.json'),
-        (Join-Path $scriptRoot 'config\config.json'),
-        (Join-Path $scriptRoot '..\SPO-SiteInventory\config\config.json')
+        (Join-Path $scriptRoot 'config\config.json')
     )
 
     if ($ConfigPath) {

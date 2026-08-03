@@ -12,7 +12,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.28
+    Version : v1.0.29
     Requires: PnP.PowerShell 2.x+
     Auth    : App-only certificate only. For interactive browser sign-in, use
               Invoke-SPOGovernanceAnalyzer-Interactive.ps1 instead — this script now
@@ -20,12 +20,17 @@
               Config search order — first file found wins:
                 1. %USERPROFILE%\.spo-tools\config.json   (recommended; shared across tools)
                 2. <script folder>\config\config.json      (local, created by Setup-SPOGovernanceAnalyzer-AppRegistration.ps1)
-                3. <script folder>\..\SPO-SiteInventory\config\config.json  (sibling tool fallback)
               Required keys: TenantId, ClientId, CertificateThumbprint
     Perms   : SharePoint > Sites.FullControl.All (application)
               Microsoft Graph > Reports.Read.All, Sites.Read.All, User.Read.All
 
 .CHANGELOG
+    v1.0.29 - 2026-08-03 - Removed the ../SPO-SiteInventory/config/config.json sibling-tool
+              fallback from the config search order — that tool is a separate, non-public
+              project not distributed with this repo, so the fallback path never resolved
+              for anyone outside the original environment. Same cleanup applied to
+              Get-SPOSiteRCDAndSensitivityLabel.ps1, Test-SPOSiteLabel.ps1,
+              Setup-SPOGovernanceAnalyzer-AppRegistration.ps1 and the README.
     v1.0.28 - 2026-08-03 - Split interactive (browser) sign-in out into its own script,
               Invoke-SPOGovernanceAnalyzer-Interactive.ps1. This script is now App
               Registration (certificate) only: config.json is required up front and the
@@ -67,7 +72,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.28'
+$ScriptVersion = 'v1.0.29'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -1247,8 +1252,7 @@ $(if ($inactiveRows.Count -gt 0) { $inactiveRows -join "`n" } else { '| *No inac
 # Lookup order: user profile (outside any repo - safe), then local fallback
 $configPaths = @(
     "$env:USERPROFILE\.spo-tools\config.json",
-    (Join-Path $ScriptRoot 'config\config.json'),
-    (Join-Path $ScriptRoot '..\SPO-SiteInventory\config\config.json')
+    (Join-Path $ScriptRoot 'config\config.json')
 )
 $configPath = $configPaths | Where-Object { Test-Path $_ } | Select-Object -First 1
 $config = $null
