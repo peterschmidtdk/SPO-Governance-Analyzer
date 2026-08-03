@@ -14,7 +14,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.1
+    Version : v1.0.2
     Requires: PnP.PowerShell 2.x+
     Auth    : Interactive browser sign-in only. For unattended/scheduled runs with an App
               Registration and certificate, use Invoke-SPOGovernanceAnalyzer.ps1 instead.
@@ -29,8 +29,14 @@
     Perms   : SharePoint > Sites.FullControl.All (delegated, via the per-tenant app above)
               Microsoft Graph > Reports.Read.All, Sites.Read.All, User.Read.All,
                                 InformationProtectionPolicy.Read (all delegated)
+              (User.Read.All also covers the optional security-group expansion below —
+              no extra Graph scope needed for it.)
 
 .CHANGELOG
+    v1.0.2 - 2026-08-04 - Added the same opt-in "Expand security group membership?" prompt
+              as Invoke-SPOGovernanceAnalyzer.ps1 v1.0.31 — resolves Entra ID security
+              groups found in site permissions to their direct members via
+              Get-PnPEntraIDGroupMember, one level deep, cached per run. Off by default.
     v1.0.1 - 2026-08-03 - Fixed two real-tenant runtime errors also found in the App
               Registration script: (1) Get-PnPAccessToken -ResourceTypeName MSGraph is
               invalid; corrected to Graph. (2) Get-PnPSensitivityLabel never shipped as a
@@ -52,7 +58,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.1'
+$ScriptVersion = 'v1.0.2'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -170,6 +176,23 @@ function Test-IsExternalUser {
     # Email hint when LoginName pattern is not definitive
     if ($Email -like '*#ext#*')              { return $true }
     return $false
+}
+
+function Get-EntraGroupMembersCached {
+    # Resolves an Entra ID security group's direct members via Get-PnPEntraIDGroupMember.
+    # Cached per run, keyed by group ObjectId, so a group referenced from many sites (or
+    # many times on the same site) only costs one Graph call. One level deep — a member
+    # that is itself a group is listed but not recursed into, to bound cost and runtime.
+    param([string]$GroupId, $Connection)
+    if ($groupMemberCache.ContainsKey($GroupId)) { return $groupMemberCache[$GroupId] }
+    $members = @()
+    try {
+        $members = @(Get-PnPEntraIDGroupMember -Identity $GroupId -Connection $Connection -ErrorAction Stop)
+    } catch {
+        $errList.Add("EntraGroupExpand | $GroupId | $($_.Exception.Message)")
+    }
+    $groupMemberCache[$GroupId] = $members
+    return $members
 }
 
 function Get-CopilotReadiness {
@@ -497,8 +520,14 @@ function Export-GovernanceHtml {
             $pmTypCls = if ($pm.PermissionType -eq 'SiteAdmin') { 'info'  } else { 'neutral' }
             $pmFlags  = ''
             if ($pm.IsExternal -eq $true)      { $pmFlags += "<span class='pill warn' style='font-size:10px;min-width:0;height:20px;padding:0 6px'>Ext</span> " }
-            if ($pm.IsEveryoneGroup -eq $true) { $pmFlags += "<span class='pill critical' style='font-size:10px;min-width:0;height:20px;padding:0 6px'>Everyone</span>" }
-            $null = $detailHtml.AppendLine("<tr><td><span class='pill $pmTypCls' style='font-size:11px;min-width:0;height:20px;padding:0 7px'>$pmTypLbl</span></td><td>$(EscHtml $pm.GroupName)</td><td>$(EscHtml $pm.DisplayName)</td><td>$(EscHtml $pm.Email)</td><td>$pmFlags</td></tr>")
+            if ($pm.IsEveryoneGroup -eq $true) { $pmFlags += "<span class='pill critical' style='font-size:10px;min-width:0;height:20px;padding:0 6px'>Everyone</span> " }
+            $pmGroupDisp = EscHtml $pm.GroupName
+            if ($pm.SourceGroup) {
+                $pmFlags += "<span class='pill neutral' style='font-size:10px;min-width:0;height:20px;padding:0 6px'>Nested</span>"
+                $viaLbl = "<span style='color:#9ca3af;font-size:11px'>via $(EscHtml $pm.SourceGroup)</span>"
+                $pmGroupDisp = if ($pmGroupDisp) { "$pmGroupDisp<br>$viaLbl" } else { $viaLbl }
+            }
+            $null = $detailHtml.AppendLine("<tr><td><span class='pill $pmTypCls' style='font-size:11px;min-width:0;height:20px;padding:0 7px'>$pmTypLbl</span></td><td>$pmGroupDisp</td><td>$(EscHtml $pm.DisplayName)</td><td>$(EscHtml $pm.Email)</td><td>$pmFlags</td></tr>")
         }
         if ($permCount -eq 0) {
             $null = $detailHtml.AppendLine("<tr><td colspan='5' style='color:#9ca3af;padding:10px'>No permission data collected for this site</td></tr>")
@@ -1374,6 +1403,19 @@ switch ($scopeChoice) {
 }
 Write-Host ''
 
+Write-Section 'SECURITY GROUPS'
+Write-Host '  Permissions granted directly to an Entra ID security group normally show only' -ForegroundColor DarkGray
+Write-Host '  the group name. Expanding resolves each group''s direct members via Microsoft' -ForegroundColor DarkGray
+Write-Host '  Graph and lists them alongside that group in the report (one level deep — a' -ForegroundColor DarkGray
+Write-Host '  member that is itself a group is not recursed into). Each group is resolved' -ForegroundColor DarkGray
+Write-Host '  once and cached, but this still adds scan time on tenants with heavy' -ForegroundColor DarkGray
+Write-Host '  group-based permissioning.' -ForegroundColor DarkGray
+Write-Host ''
+$expandInput = Read-Host '  ❯ Expand security group membership? [y/N]'
+$ExpandGroups = ($expandInput -in 'Y','y')
+$groupMemberCache = @{}
+Write-Host ''
+
 # ── Connect ───────────────────────────────────────────────────────────────────
 Write-Host '  Connecting to admin center...' -ForegroundColor Cyan
 try {
@@ -1560,11 +1602,23 @@ foreach ($site in $sites) {
                 $siteAdminNames.Add($a.Title)
                 $siteTotalPerms++
                 $allPermissions.Add([PSCustomObject]@{
-                    SiteUrl='';SiteTitle=$site.Title;PermissionType='SiteAdmin';GroupName='';
+                    SiteUrl=$site.Url;SiteTitle=$site.Title;PermissionType='SiteAdmin';GroupName='';
                     DisplayName=$a.Title;LoginName=$a.LoginName;Email=$a.Email;
-                    IsExternal=$isExt;IsEveryoneGroup=$isEv
+                    IsExternal=$isExt;IsEveryoneGroup=$isEv;SourceGroup=''
                 })
-                $allPermissions[$allPermissions.Count - 1].SiteUrl = $site.Url
+
+                if ($ExpandGroups -and $a.PrincipalType -eq 'SecurityGroup' -and $a.LoginName) {
+                    $adGroupId = ($a.LoginName -split '\|')[-1]
+                    foreach ($nm in (Get-EntraGroupMembersCached -GroupId $adGroupId -Connection $adminConn)) {
+                        $nmIsExt = Test-IsExternalUser -LoginName $nm.UserPrincipalName -Email $nm.Mail
+                        $siteTotalPerms++
+                        $allPermissions.Add([PSCustomObject]@{
+                            SiteUrl=$site.Url;SiteTitle=$site.Title;PermissionType='SiteAdmin';GroupName='';
+                            DisplayName=$nm.DisplayName;LoginName=$nm.UserPrincipalName;Email=$nm.Mail;
+                            IsExternal=$nmIsExt;IsEveryoneGroup=$false;SourceGroup=$a.Title
+                        })
+                    }
+                }
             }
         } catch { $errList.Add("Admins | $($site.Url) | $($_.Exception.Message)") }
 
@@ -1585,8 +1639,21 @@ foreach ($site in $sites) {
                         $allPermissions.Add([PSCustomObject]@{
                             SiteUrl=$site.Url;SiteTitle=$site.Title;PermissionType='GroupMember';
                             GroupName=$grp.Title;DisplayName=$m.Title;LoginName=$m.LoginName;
-                            Email=$m.Email;IsExternal=$isExt;IsEveryoneGroup=$isEv
+                            Email=$m.Email;IsExternal=$isExt;IsEveryoneGroup=$isEv;SourceGroup=''
                         })
+
+                        if ($ExpandGroups -and $m.PrincipalType -eq 'SecurityGroup' -and $m.LoginName) {
+                            $adGroupId = ($m.LoginName -split '\|')[-1]
+                            foreach ($nm in (Get-EntraGroupMembersCached -GroupId $adGroupId -Connection $adminConn)) {
+                                $nmIsExt = Test-IsExternalUser -LoginName $nm.UserPrincipalName -Email $nm.Mail
+                                $siteTotalPerms++
+                                $allPermissions.Add([PSCustomObject]@{
+                                    SiteUrl=$site.Url;SiteTitle=$site.Title;PermissionType='GroupMember';
+                                    GroupName=$grp.Title;DisplayName=$nm.DisplayName;LoginName=$nm.UserPrincipalName;
+                                    Email=$nm.Mail;IsExternal=$nmIsExt;IsEveryoneGroup=$false;SourceGroup=$m.Title
+                                })
+                            }
+                        }
                     }
                 } catch { $errList.Add("Group '$($grp.Title)' | $($site.Url) | $($_.Exception.Message)") }
             }
@@ -1806,6 +1873,10 @@ Write-Host "  Storage            : $($stats.storageGB) GB"      -ForegroundColor
 Write-Host "  Errors             : $($errList.Count)"           -ForegroundColor $(if ($errList.Count -gt 0) {'Yellow'} else {'Gray'})
 Write-Host "  Partial run       : $(if ($partialRun) {'Yes'} else {'No'})" -ForegroundColor $(if ($partialRun) {'Yellow'} else {'Gray'})
 Write-Host "  Scan duration      : $scanElapsedStr"           -ForegroundColor Gray
+if ($ExpandGroups) {
+    $nestedCount = @($allPermissions | Where-Object { $_.SourceGroup }).Count
+    Write-Host "  Security groups    : $($groupMemberCache.Count) expanded, $nestedCount nested member(s) added" -ForegroundColor Gray
+}
 Write-Host ''
 Write-Host "  $(if (Test-Path -LiteralPath $siteCsvPath) {'✓'} else {'✗'})  Sites CSV    : $siteCsvPath" -ForegroundColor $(if (Test-Path -LiteralPath $siteCsvPath) {'Green'} else {'Red'})
 Write-Host "  $(if (Test-Path -LiteralPath $permCsvPath) {'✓'} else {'✗'})  Perms CSV    : $permCsvPath" -ForegroundColor $(if (Test-Path -LiteralPath $permCsvPath) {'Green'} else {'Red'})

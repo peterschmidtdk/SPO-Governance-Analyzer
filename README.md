@@ -19,6 +19,7 @@ The script connects to your SharePoint Online tenant using app-only certificate 
    - Document library and file counts
    - Owner count / ownerless flag
    - Archive status, Teams connection
+   - Optionally, the direct members of any Entra ID security group found among the above (see Security Group Expansion below)
 4. Detects "Everyone" / "Everyone except external users" group access (critical governance finding)
 5. Identifies external users by login name pattern
 6. Computes a **CopilotReadiness** tier per site (see tiers below)
@@ -133,8 +134,30 @@ Create (or reuse) `config\config.json`:
 Both prompt for:
 - **Inactive threshold** — days before a site is flagged inactive (default: 90)
 - **Scope** — all sites, URL substring filter, or single site URL
+- **Expand security group membership?** — off by default (see Security Group Expansion below)
 
 No parameters are required; everything is interactive at the console.
+
+---
+
+## Security Group Expansion
+
+Site permissions granted directly to an Entra ID security group (a common alternative to
+adding individual users) normally show up as just the group's name — the report has no way
+to know who's actually in it. Answering `Y` to the "Expand security group membership?"
+prompt resolves each such group's **direct** members via Microsoft Graph
+(`Get-PnPEntraIDGroupMember`) and adds them to the permission overview, tagged with a
+**Nested** badge and the source group name — in both the CSV (`SourceGroup` column) and the
+HTML report's expandable per-site permission table.
+
+- **One level deep** — a member that is itself a group is listed but not recursed into, to
+  keep cost and runtime bounded.
+- **Cached per run** — each group is resolved once even if referenced from many sites.
+- **No extra Graph permission needed** — reuses the `User.Read.All` scope already granted
+  for App Registration mode; interactive mode's per-tenant sign-in app requests the
+  delegated equivalent automatically.
+- **Off by default** — it adds one Graph call per unique group found, which adds real scan
+  time on tenants with heavy group-based permissioning.
 
 ---
 
@@ -146,7 +169,7 @@ No parameters are required; everything is interactive at the console.
 - **Copilot Readiness filter** dropdown — quickly isolate Critical / High / etc.
 - **Checkbox filters** — External sharing, Everyone access, Ownerless, Inactive
 - **Sortable columns** — click any header; sort direction indicator on active column
-- **Expandable permission rows** — click the permission count button on any site row to expand a sub-table showing all admins and group members for that site, with External and Everyone badges
+- **Expandable permission rows** — click the permission count button on any site row to expand a sub-table showing all admins and group members for that site, with External, Everyone and Nested badges (see Security Group Expansion above)
 
 ---
 
@@ -166,6 +189,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.31 | 2026-08-04 | Added an opt-in "Expand security group membership?" prompt — see Security Group Expansion above. |
 | v1.0.30 | 2026-08-03 | Fixed two real-tenant runtime errors: `Get-PnPAccessToken -ResourceTypeName MSGraph` (invalid — corrected to `Graph`) and `Get-PnPSensitivityLabel` (never shipped as a stable cmdlet — replaced with `Get-PnPAvailableSensitivityLabel`, which needs the new `InformationProtectionPolicy.Read.All` Graph permission below). |
 | v1.0.29 | 2026-08-03 | Removed the `../SPO-SiteInventory/config/config.json` sibling-tool config fallback — that tool is a separate, non-public project not distributed with this repo. Same cleanup applied to `Get-SPOSiteRCDAndSensitivityLabel.ps1`, `Test-SPOSiteLabel.ps1` and `Setup-SPOGovernanceAnalyzer-AppRegistration.ps1`. |
 | v1.0.28 | 2026-08-03 | Split interactive (browser) sign-in out into `Invoke-SPOGovernanceAnalyzer-Interactive.ps1`. This script is now App Registration (certificate) only — `config.json` required up front, `[1]/[2]` auth-mode picker removed. Also fixes a live bug: the connect-failure handler called a never-defined `Repair-PnPManagementShellConsent` function, masking real connection errors in interactive mode. Console banner and prompts refreshed. |
@@ -176,6 +200,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.2 | 2026-08-04 | Same "Expand security group membership?" prompt as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.31 — see Security Group Expansion above. |
 | v1.0.1 | 2026-08-03 | Same cmdlet fixes as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.30, plus the per-tenant sign-in app now requests Graph delegated permissions (`Reports.Read.All`, `Sites.Read.All`, `User.Read.All`, `InformationProtectionPolicy.Read`) — it previously requested none, so Graph usage data and label names would have failed silently even after the cmdlet fixes. If you registered the sign-in app before this version, delete its cache file so it re-registers with the new scopes. |
 | v1.0.0 | 2026-08-03 | New script, split out of `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.27. Same report and scan logic; interactive (browser) sign-in only, via a per-tenant Entra ID app registered through `Register-PnPEntraIDAppForInteractiveLogin`. |
 
