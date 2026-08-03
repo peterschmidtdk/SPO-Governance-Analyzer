@@ -1,0 +1,27 @@
+# Output files — generated per run, not stored in repo
+output/
+
+# Local fix/session timelog — working notes, not stored in repo
+timelog/
+
+# Design mockup reference — local working file, not stored in repo
+mockup/
+
+# Claude Code local settings/permissions — machine-specific, not stored in repo
+.claude/
+
+# History data — local trend data, regenerated on each machine
+history.jsonl
+
+# Credentials — store in %USERPROFILE%\.spo-tools\config.json instead
+config/config.json
+config/*.pfx
+
+# Logs
+logs/
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
