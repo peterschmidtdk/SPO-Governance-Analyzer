@@ -12,7 +12,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.35
+    Version : v1.0.36
     Requires: PnP.PowerShell 2.x+
     Auth    : App-only certificate only. For interactive browser sign-in, use
               Invoke-SPOGovernanceAnalyzer-Interactive.ps1 instead — this script now
@@ -29,6 +29,13 @@
               to grant it on an existing App Registration.)
 
 .CHANGELOG
+    v1.0.36 - 2026-08-04 - Removed the KPI card sparkline trend lines (kpi-spark SVG polylines)
+              at user request — with only a handful of history.jsonl points and aggressive
+              min/max auto-scaling, a run-to-run swing in a metric (e.g. a differently-scoped
+              scan) rendered as a sharp, misleading spike rather than a readable trend.
+              Removed the now-unused Get-SparklineSvg and Get-HistoryValues helper functions
+              and the .kpi-spark CSS. The ▲/▼ change badges vs. the previous run (Get-ChangeBadge)
+              are unaffected and still shown.
     v1.0.35 - 2026-08-04 - Wrapped the sensitivity label cache fetch (Get-PnPAvailableSensitivityLabel)
               in the existing Invoke-WithRetry helper (3 attempts, 2s backoff). Reported cause
               on a real tenant with published label policies: "Internal Server Error (500)" —
@@ -119,7 +126,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.35'
+$ScriptVersion = 'v1.0.36'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -229,30 +236,6 @@ function Get-HistProp {
     if ($prop) { return $prop.Value } else { return $null }
 }
 
-function Get-HistoryValues {
-    param([object[]]$History,[string]$Key,[int]$Last=20)
-    if (-not $History -or $History.Count -eq 0) { return @() }
-    return @($History | Select-Object -Last $Last | ForEach-Object {
-        $v = Get-HistProp -Obj $_ -Key $Key
-        if ($null -ne $v) { try { [double]$v } catch {} }
-    } | Where-Object { $null -ne $_ })
-}
-
-function Get-SparklineSvg {
-    param([double[]]$Values,[string]$CssVar='var(--c-blue)',[int]$W=80,[int]$H=24)
-    if ($null -eq $Values -or $Values.Count -lt 2) { return '' }
-    $mn = ($Values | Measure-Object -Minimum).Minimum
-    $mx = ($Values | Measure-Object -Maximum).Maximum
-    $rng = if ($mx -gt $mn) { $mx - $mn } else { 1 }
-    $pad = 2
-    $pts = for ($i = 0; $i -lt $Values.Count; $i++) {
-        $x = [int]($i / ($Values.Count - 1) * ($W - $pad*2) + $pad)
-        $y = [int](($H - $pad) - ($Values[$i] - $mn) / $rng * ($H - $pad*2))
-        "$x,$y"
-    }
-    return "<svg class='spark' viewBox='0 0 $W $H' xmlns='http://www.w3.org/2000/svg'><polyline points='$($pts -join ' ')' style='fill:none;stroke:$CssVar;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round'/></svg>"
-}
-
 function Get-ChangeBadge {
     param([double]$Current,[object]$Previous,[bool]$UpIsGood=$true)
     if ($null -eq $Previous) { return "<span class='chg chg-none'>first run</span>" }
@@ -331,25 +314,11 @@ function Export-GovernanceHtml {
     $dTeamsHtml = if ($cntTeams -eq 0) { '<span class="delta info">No Teams sites</span>' } `
                   else                  { "<span class='delta info'>$([math]::Round($cntTeams/$totalSites*100))% of sites</span>" }
 
-    # ── Trend sparklines + change badges vs. previous run ──────────────────────
+    # ── Change badges vs. previous run ──────────────────────────────────────────
     # $History already includes the current run as its last entry — the main script appends
     # to history.jsonl and re-reads it before calling this function — so "the previous run"
     # is the second-to-last entry, not the last one.
     $prevEntry = if ($History -and $History.Count -ge 2) { $History[-2] } else { $null }
-
-    $sparkTotal    = Get-SparklineSvg -CssVar 'var(--brand)' -Values (Get-HistoryValues -History $History -Key 'totalSites')
-    $sparkInactive = Get-SparklineSvg -CssVar 'var(--brand)' -Values (Get-HistoryValues -History $History -Key 'inactiveSites')
-    $sparkExternal = Get-SparklineSvg -CssVar 'var(--brand)' -Values (Get-HistoryValues -History $History -Key 'externalUsers')
-    $sparkLabel    = Get-SparklineSvg -CssVar 'var(--brand)' -Values (Get-HistoryValues -History $History -Key 'unlabeledSites')
-    $sparkStorage  = Get-SparklineSvg -CssVar 'var(--brand)' -Values (Get-HistoryValues -History $History -Key 'storageGB')
-    $sparkTeams    = Get-SparklineSvg -CssVar 'var(--brand)' -Values (Get-HistoryValues -History $History -Key 'teamsSites')
-
-    $hrSeries = @($History | Select-Object -Last 20 | ForEach-Object {
-        $c = Get-HistProp $_ 'copilotCritical'; $h = Get-HistProp $_ 'copilotHigh'
-        if ($null -eq $c) { $c = 0 }; if ($null -eq $h) { $h = 0 }
-        [double]$c + [double]$h
-    })
-    $sparkHighRisk = Get-SparklineSvg -CssVar 'var(--brand)' -Values $hrSeries
 
     # Real change badges replace the static heuristic ones once a previous run exists.
     if ($prevEntry) {
@@ -643,8 +612,6 @@ function Export-GovernanceHtml {
   .kpi-label{color:var(--muted);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
   .kpi-value{font-size:36px;font-weight:800;letter-spacing:-.04em;margin-top:8px;line-height:1}
   .kpi-sub{color:var(--muted);font-size:12px;margin-top:5px;line-height:1.4}
-  .kpi-spark{margin-top:8px;height:24px;line-height:0;opacity:.85}
-  .kpi-spark svg{display:block}
   .delta{display:inline-flex;align-items:center;width:fit-content;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:700;margin-top:14px}
   .delta.good{background:#dcfce7;color:#166534}
   .delta.warn{background:#fef3c7;color:#92400e}
@@ -829,7 +796,6 @@ $(if ($Stats.usageDataCount -eq 0) {
         <div class="kpi-label">Total sites</div>
         <div class="kpi-value">$($Stats.totalSites)</div>
         <div class="kpi-sub">Team, communication &amp; group-connected</div>
-        <div class="kpi-spark">$sparkTotal</div>
       </div>
       <span class="delta info">$($Stats.activeSites) active &middot; $($Stats.inactiveSites) inactive</span>
     </div>
@@ -838,7 +804,6 @@ $(if ($Stats.usageDataCount -eq 0) {
         <div class="kpi-label">High-risk sites</div>
         <div class="kpi-value">$kpiCritHigh</div>
         <div class="kpi-sub">Critical + High Copilot readiness tier</div>
-        <div class="kpi-spark">$sparkHighRisk</div>
       </div>
       $dCritHtml
     </div>
@@ -847,7 +812,6 @@ $(if ($Stats.usageDataCount -eq 0) {
         <div class="kpi-label">Inactive sites</div>
         <div class="kpi-value">$($Stats.inactiveSites)</div>
         <div class="kpi-sub">No activity for $InactiveDays+ days</div>
-        <div class="kpi-spark">$sparkInactive</div>
       </div>
       $dInactHtml
     </div>
@@ -856,7 +820,6 @@ $(if ($Stats.usageDataCount -eq 0) {
         <div class="kpi-label">External users</div>
         <div class="kpi-value">$($Stats.externalUsers)</div>
         <div class="kpi-sub">Unique guest accounts across all sites</div>
-        <div class="kpi-spark">$sparkExternal</div>
       </div>
       $dExtHtml
     </div>
@@ -865,7 +828,6 @@ $(if ($Stats.usageDataCount -eq 0) {
         <div class="kpi-label">Unlabeled sites</div>
         <div class="kpi-value">$cntUnlabeled</div>
         <div class="kpi-sub">No Purview sensitivity label applied</div>
-        <div class="kpi-spark">$sparkLabel</div>
       </div>
       $dLblHtml
     </div>
@@ -874,7 +836,6 @@ $(if ($Stats.usageDataCount -eq 0) {
         <div class="kpi-label">Storage used</div>
         <div class="kpi-value">$($Stats.storageGB) GB</div>
         <div class="kpi-sub">Total across all scanned sites</div>
-        <div class="kpi-spark">$sparkStorage</div>
       </div>
       $dStoreHtml
     </div>
@@ -883,7 +844,6 @@ $(if ($Stats.usageDataCount -eq 0) {
         <div class="kpi-label">Teams-connected</div>
         <div class="kpi-value" style="color:#5b21b6">$cntTeams</div>
         <div class="kpi-sub">Sites linked to a Microsoft Teams team</div>
-        <div class="kpi-spark">$sparkTeams</div>
       </div>
       $dTeamsHtml
     </div>

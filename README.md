@@ -2,7 +2,7 @@
 
 **SharePoint Online Governance & Copilot Readiness Report**
 
-A single-pass PowerShell script that combines site inventory (usage, storage, governance metadata) with full permission enumeration into one site-centric report. The main output is an HTML dashboard with expandable per-site permission rows, sparkline history charts, and a Copilot Readiness tier for every site.
+A single-pass PowerShell script that combines site inventory (usage, storage, governance metadata) with full permission enumeration into one site-centric report. The main output is an HTML dashboard with expandable per-site permission rows, run-over-run change badges, and a Copilot Readiness tier for every site.
 
 ---
 
@@ -23,7 +23,7 @@ The script connects to your SharePoint Online tenant using app-only certificate 
 4. Detects "Everyone" / "Everyone except external users" group access (critical governance finding)
 5. Identifies external users by login name pattern
 6. Computes a **CopilotReadiness** tier per site (see tiers below)
-7. Writes `history.jsonl` (one line per run, capped at 365) for sparklines and change indicators on subsequent runs
+7. Writes `history.jsonl` (one line per run, capped at 365) for change indicators on subsequent runs
 8. Exports four output files per run (see Outputs)
 
 ---
@@ -50,7 +50,7 @@ All files land in the `output/` subfolder, timestamped per run:
 |------|----------|
 | `spo-governance-sites-<stamp>.csv` | One row per site — all governance fields, CopilotReadiness, aggregated permission counts |
 | `spo-governance-permissions-<stamp>.csv` | Flat permission detail — one row per admin/group member across all sites |
-| `spo-governance-<stamp>.html` | Dark/light theme HTML dashboard: 9 summary cards with sparklines, sortable/filterable table, expandable permission rows per site |
+| `spo-governance-<stamp>.html` | Dark/light theme HTML dashboard: 9 summary cards with change badges, sortable/filterable table, expandable permission rows per site |
 | `spo-governance-<stamp>.md` | Markdown executive summary: key metrics, Critical/High site tables, cleanup recommendations |
 | `spo-governance-errors-<stamp>.txt` | Sites and operations that failed (only created if errors occurred) |
 
@@ -168,7 +168,7 @@ HTML report's expandable per-site permission table.
 
 - **Dark / light theme** toggle (persists in browser localStorage)
 - **Print mode** — automatically switches to white background for clean printing
-- **9 summary cards** with sparkline trend charts and change badges vs. the previous run
+- **9 summary cards** with change badges vs. the previous run
 - **Copilot Readiness filter** dropdown — quickly isolate Critical / High / etc.
 - **Checkbox filters** — External sharing, Everyone access, Ownerless, Inactive
 - **Sortable columns** — click any header; sort direction indicator on active column
@@ -180,7 +180,6 @@ HTML report's expandable per-site permission table.
 
 Each run appends one JSON line to `history.jsonl` in the script folder. On subsequent runs the HTML report shows:
 
-- **Sparkline charts** (inline SVG, theme-responsive) for each card metric
 - **Change badges** (▲/▼ with green/red colouring) showing the delta from the previous run
 - History is capped at 365 entries (approximately one year of daily runs)
 
@@ -192,6 +191,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.36 | 2026-08-04 | Removed the KPI card sparkline trend lines — with only a handful of history points and aggressive min/max auto-scaling, a run-to-run swing (e.g. a differently-scoped scan) rendered as a sharp, misleading spike. Change badges (▲/▼ vs. previous run) are unaffected. |
 | v1.0.35 | 2026-08-04 | Wrapped the sensitivity label cache fetch (`Get-PnPAvailableSensitivityLabel`) in the existing retry helper (3 attempts) to shrug off a transient Graph `500 Internal Server Error` seen on a real tenant with published label policies — not a permissions or cmdlet issue. |
 | v1.0.34 | 2026-08-04 | Fixed the KPI summary grid stranding its 7th card (Teams-connected) alone on its own row at ~1/6 width. Switched to `repeat(auto-fit,minmax(...,1fr))` so a lone last-row card fills the full width instead. |
 | v1.0.33 | 2026-08-04 | Fixed "Teams-connected" always showing 0 — `IsTeamsConnected` was read via `Get-PnPSite -Includes 'IsTeamsConnected'`, a property that cmdlet doesn't expose at all (silently resolved to false). Now read from the `Get-PnPTenantSite -Detailed` call already made for RCD/label data. |
@@ -207,6 +207,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.7 | 2026-08-04 | Same sparkline removal as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.36. |
 | v1.0.6 | 2026-08-04 | Same retry wrap as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.35 for `Get-PnPAvailableSensitivityLabel`. |
 | v1.0.5 | 2026-08-04 | Same KPI summary grid fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.34. |
 | v1.0.4 | 2026-08-04 | Same "Teams-connected always 0" fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.33. |
