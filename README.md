@@ -192,6 +192,8 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.34 | 2026-08-04 | Fixed the KPI summary grid stranding its 7th card (Teams-connected) alone on its own row at ~1/6 width. Switched to `repeat(auto-fit,minmax(...,1fr))` so a lone last-row card fills the full width instead. |
+| v1.0.33 | 2026-08-04 | Fixed "Teams-connected" always showing 0 — `IsTeamsConnected` was read via `Get-PnPSite -Includes 'IsTeamsConnected'`, a property that cmdlet doesn't expose at all (silently resolved to false). Now read from the `Get-PnPTenantSite -Detailed` call already made for RCD/label data. |
 | v1.0.32 | 2026-08-04 | Fixed security-group expansion (v1.0.31): `Get-PnPEntraIDGroupMember` returned `403 Forbidden` for every group on first live use — `User.Read.All` was not actually sufficient despite PnP's docs listing it as one of several acceptable scopes. Added the correctly-scoped `Group.Read.All` permission. |
 | v1.0.31 | 2026-08-04 | Added an opt-in "Expand security group membership?" prompt — see Security Group Expansion above. |
 | v1.0.30 | 2026-08-03 | Fixed two real-tenant runtime errors: `Get-PnPAccessToken -ResourceTypeName MSGraph` (invalid — corrected to `Graph`) and `Get-PnPSensitivityLabel` (never shipped as a stable cmdlet — replaced with `Get-PnPAvailableSensitivityLabel`, which needs the new `InformationProtectionPolicy.Read.All` Graph permission below). |
@@ -204,6 +206,8 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.5 | 2026-08-04 | Same KPI summary grid fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.34. |
+| v1.0.4 | 2026-08-04 | Same "Teams-connected always 0" fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.33. |
 | v1.0.3 | 2026-08-04 | Same `Group.Read.All` fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.32 — added to the per-tenant sign-in app's requested delegated permissions. Re-register (delete the app's cache file) if you registered it before this version. |
 | v1.0.2 | 2026-08-04 | Same "Expand security group membership?" prompt as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.31 — see Security Group Expansion above. |
 | v1.0.1 | 2026-08-03 | Same cmdlet fixes as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.30, plus the per-tenant sign-in app now requests Graph delegated permissions (`Reports.Read.All`, `Sites.Read.All`, `User.Read.All`, `InformationProtectionPolicy.Read`) — it previously requested none, so Graph usage data and label names would have failed silently even after the cmdlet fixes. If you registered the sign-in app before this version, delete its cache file so it re-registers with the new scopes. |

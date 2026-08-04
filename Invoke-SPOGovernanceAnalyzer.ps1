@@ -12,7 +12,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.32
+    Version : v1.0.34
     Requires: PnP.PowerShell 2.x+
     Auth    : App-only certificate only. For interactive browser sign-in, use
               Invoke-SPOGovernanceAnalyzer-Interactive.ps1 instead — this script now
@@ -29,6 +29,20 @@
               to grant it on an existing App Registration.)
 
 .CHANGELOG
+    v1.0.34 - 2026-08-04 - Fixed the KPI summary grid stranding its 7th card (Teams-connected)
+              alone on its own row at roughly 1/6 width with a large empty gap beside it —
+              the grid used a fixed 6-column template but there are 7 KPI cards. Switched
+              .kpis (and its two responsive breakpoints) from a fixed column count to
+              repeat(auto-fit,minmax(...,1fr)), so a lone card in the last row stretches to
+              fill the full row width instead of sitting cramped in a narrow fixed slot, and
+              the layout no longer needs a manual CSS edit if a card is added or removed.
+    v1.0.33 - 2026-08-04 - Fixed "Teams-connected" always showing 0. IsTeamsConnected was
+              read from Get-PnPSite -Includes 'IsTeamsConnected', but that property does not
+              exist on the Get-PnPSite (CSOM) object at all — it silently resolved to
+              nothing (falsy) for every site instead of erroring. It only exists on
+              Get-PnPTenantSite, which the scan already calls with -Detailed for RCD and
+              SensitivityLabel; IsTeamsConnected is now read from that same call instead of
+              a separate (broken) one.
     v1.0.32 - 2026-08-04 - Fixed security-group expansion (v1.0.31) silently finding nothing:
               Get-PnPEntraIDGroupMember returned "403 Forbidden" for every group on first
               live use. PnP's own docs list User.Read.All as one of several sufficient Graph
@@ -99,7 +113,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.32'
+$ScriptVersion = 'v1.0.34'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -611,7 +625,7 @@ function Export-GovernanceHtml {
 
   /* Grids */
   .grid{display:grid;gap:18px;margin-bottom:18px}
-  .kpis{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
   .two-col{grid-template-columns:1.15fr .85fr}
   .three-col{grid-template-columns:repeat(3,minmax(0,1fr))}
 
@@ -736,7 +750,7 @@ function Export-GovernanceHtml {
   .footer{color:var(--muted);font-size:12px;text-align:center;padding:28px 0 16px}
 
   @media(max-width:1180px){
-    .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .kpis{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
     .two-col,.three-col{grid-template-columns:1fr}
     .hero-top{flex-direction:column}
     .report-meta{width:100%}
@@ -744,7 +758,7 @@ function Export-GovernanceHtml {
   @media(max-width:760px){
     .page{padding:14px}
     .hero h1{font-size:26px}
-    .kpis{grid-template-columns:1fr 1fr}
+    .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
     .score-wrap{grid-template-columns:1fr}
     .bar-row{grid-template-columns:80px 1fr 34px}
   }
@@ -1534,6 +1548,7 @@ foreach ($site in $sites) {
         try {
             $tenantSite = Get-PnPTenantSite -Identity $site.Url -Detailed -Connection $adminConn -ErrorAction Stop
             $rcd = if ($tenantSite.RestrictContentOrgWideSearch) { 'True' } else { 'False' }
+            $isTeamsConn = [bool]$tenantSite.IsTeamsConnected
             $labelGuid = $tenantSite.SensitivityLabel.ToString()
             if ($labelGuid -and $labelGuid -ne '00000000-0000-0000-0000-000000000000' -and $labelGuid -ne '') {
                 $sensitivityLabel = if ($labelMap.ContainsKey($labelGuid.ToLower())) { $labelMap[$labelGuid.ToLower()] } else { $labelGuid }
@@ -1565,10 +1580,6 @@ foreach ($site in $sites) {
             $isInactive = ($daysSince -ge $InactiveDays)
         }
         # else: daysSince stays 9999, isInactive stays false — no data from any source
-
-        try {
-            $isTeamsConn = (Get-PnPSite -Includes 'IsTeamsConnected' -ErrorAction SilentlyContinue).IsTeamsConnected
-        } catch { }
 
         try {
             $archSite = Get-PnPSite -Includes 'ArchiveStatus' -ErrorAction SilentlyContinue

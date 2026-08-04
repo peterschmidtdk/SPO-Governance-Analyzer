@@ -14,7 +14,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.3
+    Version : v1.0.5
     Requires: PnP.PowerShell 2.x+
     Auth    : Interactive browser sign-in only. For unattended/scheduled runs with an App
               Registration and certificate, use Invoke-SPOGovernanceAnalyzer.ps1 instead.
@@ -33,6 +33,14 @@
               prompt.)
 
 .CHANGELOG
+    v1.0.5 - 2026-08-04 - Same KPI summary grid fix as Invoke-SPOGovernanceAnalyzer.ps1
+              v1.0.34 — the 7th card (Teams-connected) was stranded alone on its own row at
+              roughly 1/6 width. .kpis and its two responsive breakpoints now use
+              repeat(auto-fit,minmax(...,1fr)) so a lone last-row card fills the full width.
+    v1.0.4 - 2026-08-04 - Same "Teams-connected always 0" fix as Invoke-SPOGovernanceAnalyzer.ps1
+              v1.0.33 — IsTeamsConnected is read from the existing Get-PnPTenantSite -Detailed
+              call instead of a Get-PnPSite -Includes 'IsTeamsConnected' call, which doesn't
+              expose that property at all and silently resolved to false for every site.
     v1.0.3 - 2026-08-04 - Fixed security-group expansion (v1.0.2) silently finding nothing:
               Get-PnPEntraIDGroupMember returned "403 Forbidden" for every group on first
               live use — User.Read.All alone was not sufficient despite PnP's own docs
@@ -65,7 +73,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.3'
+$ScriptVersion = 'v1.0.5'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -635,7 +643,7 @@ function Export-GovernanceHtml {
 
   /* Grids */
   .grid{display:grid;gap:18px;margin-bottom:18px}
-  .kpis{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .kpis{grid-template-columns:repeat(auto-fit,minmax(190px,1fr))}
   .two-col{grid-template-columns:1.15fr .85fr}
   .three-col{grid-template-columns:repeat(3,minmax(0,1fr))}
 
@@ -760,7 +768,7 @@ function Export-GovernanceHtml {
   .footer{color:var(--muted);font-size:12px;text-align:center;padding:28px 0 16px}
 
   @media(max-width:1180px){
-    .kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .kpis{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
     .two-col,.three-col{grid-template-columns:1fr}
     .hero-top{flex-direction:column}
     .report-meta{width:100%}
@@ -768,7 +776,7 @@ function Export-GovernanceHtml {
   @media(max-width:760px){
     .page{padding:14px}
     .hero h1{font-size:26px}
-    .kpis{grid-template-columns:1fr 1fr}
+    .kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
     .score-wrap{grid-template-columns:1fr}
     .bar-row{grid-template-columns:80px 1fr 34px}
   }
@@ -1548,6 +1556,7 @@ foreach ($site in $sites) {
         try {
             $tenantSite = Get-PnPTenantSite -Identity $site.Url -Detailed -Connection $adminConn -ErrorAction Stop
             $rcd = if ($tenantSite.RestrictContentOrgWideSearch) { 'True' } else { 'False' }
+            $isTeamsConn = [bool]$tenantSite.IsTeamsConnected
             $labelGuid = $tenantSite.SensitivityLabel.ToString()
             if ($labelGuid -and $labelGuid -ne '00000000-0000-0000-0000-000000000000' -and $labelGuid -ne '') {
                 $sensitivityLabel = if ($labelMap.ContainsKey($labelGuid.ToLower())) { $labelMap[$labelGuid.ToLower()] } else { $labelGuid }
@@ -1579,10 +1588,6 @@ foreach ($site in $sites) {
             $isInactive = ($daysSince -ge $InactiveDays)
         }
         # else: daysSince stays 9999, isInactive stays false — no data from any source
-
-        try {
-            $isTeamsConn = (Get-PnPSite -Includes 'IsTeamsConnected' -ErrorAction SilentlyContinue).IsTeamsConnected
-        } catch { }
 
         try {
             $archSite = Get-PnPSite -Includes 'ArchiveStatus' -ErrorAction SilentlyContinue
