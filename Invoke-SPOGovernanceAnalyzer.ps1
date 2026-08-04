@@ -12,7 +12,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.34
+    Version : v1.0.35
     Requires: PnP.PowerShell 2.x+
     Auth    : App-only certificate only. For interactive browser sign-in, use
               Invoke-SPOGovernanceAnalyzer-Interactive.ps1 instead — this script now
@@ -29,6 +29,12 @@
               to grant it on an existing App Registration.)
 
 .CHANGELOG
+    v1.0.35 - 2026-08-04 - Wrapped the sensitivity label cache fetch (Get-PnPAvailableSensitivityLabel)
+              in the existing Invoke-WithRetry helper (3 attempts, 2s backoff). Reported cause
+              on a real tenant with published label policies: "Internal Server Error (500)" —
+              a transient Microsoft Graph fault, not a permissions or cmdlet issue (both
+              already confirmed correct). Retrying is a pragmatic mitigation for a
+              server-side condition this script can't otherwise diagnose or prevent.
     v1.0.34 - 2026-08-04 - Fixed the KPI summary grid stranding its 7th card (Teams-connected)
               alone on its own row at roughly 1/6 width with a large empty gap beside it —
               the grid used a fixed 6-column template but there are 7 KPI cards. Switched
@@ -113,7 +119,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.34'
+$ScriptVersion = 'v1.0.35'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -1444,9 +1450,11 @@ if ($sites.Count -eq 0) { Write-Host '  No sites matched.' -ForegroundColor Yell
 Write-Host "  Sites to scan: $($sites.Count)" -ForegroundColor Green
 
 # ── Sensitivity label name cache ──────────────────────────────────────────────
+# Retried — the underlying Graph endpoint has been observed to return a transient
+# "500 Internal Server Error" even against a tenant with published label policies.
 $labelMap = @{}
 try {
-    Get-PnPAvailableSensitivityLabel -Connection $adminConn -ErrorAction Stop | ForEach-Object {
+    Invoke-WithRetry -ScriptBlock { Get-PnPAvailableSensitivityLabel -Connection $adminConn -ErrorAction Stop } | ForEach-Object {
         $labelMap[$_.Id.ToString().ToLower()] = $_.Name
     }
     if ($labelMap.Count -gt 0) { Write-Host "  Sensitivity labels cached: $($labelMap.Count)" -ForegroundColor Green }

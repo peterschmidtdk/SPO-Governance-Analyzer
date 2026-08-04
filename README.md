@@ -192,6 +192,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.35 | 2026-08-04 | Wrapped the sensitivity label cache fetch (`Get-PnPAvailableSensitivityLabel`) in the existing retry helper (3 attempts) to shrug off a transient Graph `500 Internal Server Error` seen on a real tenant with published label policies — not a permissions or cmdlet issue. |
 | v1.0.34 | 2026-08-04 | Fixed the KPI summary grid stranding its 7th card (Teams-connected) alone on its own row at ~1/6 width. Switched to `repeat(auto-fit,minmax(...,1fr))` so a lone last-row card fills the full width instead. |
 | v1.0.33 | 2026-08-04 | Fixed "Teams-connected" always showing 0 — `IsTeamsConnected` was read via `Get-PnPSite -Includes 'IsTeamsConnected'`, a property that cmdlet doesn't expose at all (silently resolved to false). Now read from the `Get-PnPTenantSite -Detailed` call already made for RCD/label data. |
 | v1.0.32 | 2026-08-04 | Fixed security-group expansion (v1.0.31): `Get-PnPEntraIDGroupMember` returned `403 Forbidden` for every group on first live use — `User.Read.All` was not actually sufficient despite PnP's docs listing it as one of several acceptable scopes. Added the correctly-scoped `Group.Read.All` permission. |
@@ -206,6 +207,7 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.6 | 2026-08-04 | Same retry wrap as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.35 for `Get-PnPAvailableSensitivityLabel`. |
 | v1.0.5 | 2026-08-04 | Same KPI summary grid fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.34. |
 | v1.0.4 | 2026-08-04 | Same "Teams-connected always 0" fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.33. |
 | v1.0.3 | 2026-08-04 | Same `Group.Read.All` fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.32 — added to the per-tenant sign-in app's requested delegated permissions. Re-register (delete the app's cache file) if you registered it before this version. |
