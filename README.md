@@ -187,6 +187,8 @@ Each run appends one JSON line to `history.jsonl` in the script folder. On subse
 
 ## Version History
 
+See [ROADMAP.md](ROADMAP.md) for known issues and planned work not yet actioned.
+
 **`Invoke-SPOGovernanceAnalyzer.ps1`**
 
 | Version | Date | Notes |
