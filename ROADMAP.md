@@ -20,6 +20,13 @@ the source of truth for what shipped and when).
   which papers over it, but the root cause on a tenant with confirmed published label
   policies is still unconfirmed. Worth a deeper look (or a Microsoft support case) if it
   keeps recurring rather than clearing on retry.
+- **Per-site sensitivity label not shown in the report** — reported not displaying for a
+  site even though the tenant has labels published. Not yet root-caused; candidates: the
+  label cache (`$labelMap`, fed by `Get-PnPAvailableSensitivityLabel`) failing/empty (see the
+  500-error item above) so the GUID can't resolve to a name, or `$tenantSite.SensitivityLabel`
+  itself coming back empty from `Get-PnPTenantSite -Detailed` for some sites — the same
+  bulk-vs-detailed unreliability already noted in that call's code comment for RCD. Needs a
+  console/error-log check on an affected site to tell which.
 
 ## Roadmap / Ideas
 
