@@ -14,7 +14,7 @@
 
 .NOTES
     Author  : Peter Schmidt
-    Version : v1.0.7
+    Version : v1.0.8
     Requires: PnP.PowerShell 2.x+
     Auth    : Interactive browser sign-in only. For unattended/scheduled runs with an App
               Registration and certificate, use Invoke-SPOGovernanceAnalyzer.ps1 instead.
@@ -33,6 +33,8 @@
               prompt.)
 
 .CHANGELOG
+    v1.0.8 - 2026-08-06 - Same history.jsonl folder move as Invoke-SPOGovernanceAnalyzer.ps1
+              v1.0.37 — now lives in a history\ subfolder instead of the script root.
     v1.0.7 - 2026-08-04 - Same sparkline removal as Invoke-SPOGovernanceAnalyzer.ps1 v1.0.36 —
               removed the KPI card trend-line SVGs, Get-SparklineSvg, and Get-HistoryValues.
               Change badges (▲/▼ vs. previous run) are unaffected.
@@ -80,7 +82,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Single source of truth for the version string shown in console, HTML and Markdown output.
-$ScriptVersion = 'v1.0.7'
+$ScriptVersion = 'v1.0.8'
 
 # Always force-import to prevent the .NET "assembly already loaded" conflict.
 # The conditional check is not enough — PnP can be in a partially-loaded state
@@ -1294,12 +1296,19 @@ $(if ($inactiveRows.Count -gt 0) { $inactiveRows -join "`n" } else { '| *No inac
 # No config.json in this script — interactive mode only needs a tenant name and a browser.
 $stamp        = Get-Date -Format 'yyyyMMdd-HHmmss'
 $outputFolder = Join-Path $ScriptRoot 'output'
-$histPath     = Join-Path $ScriptRoot 'history.jsonl'
+$historyFolder= Join-Path $ScriptRoot 'history'
+$histPath     = Join-Path $historyFolder 'history.jsonl'
 if (Test-Path -LiteralPath $outputFolder -PathType Leaf) {
     throw "Output path exists as a file, not a folder: $outputFolder"
 }
 if (-not (Test-Path -LiteralPath $outputFolder -PathType Container)) {
     New-Item -Path $outputFolder -ItemType Directory -Force -ErrorAction Stop | Out-Null
+}
+if (Test-Path -LiteralPath $historyFolder -PathType Leaf) {
+    throw "History path exists as a file, not a folder: $historyFolder"
+}
+if (-not (Test-Path -LiteralPath $historyFolder -PathType Container)) {
+    New-Item -Path $historyFolder -ItemType Directory -Force -ErrorAction Stop | Out-Null
 }
 
 # ── Banner ────────────────────────────────────────────────────────────────────

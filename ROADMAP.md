@@ -27,8 +27,19 @@ the source of truth for what shipped and when).
   itself coming back empty from `Get-PnPTenantSite -Detailed` for some sites — the same
   bulk-vs-detailed unreliability already noted in that call's code comment for RCD. Needs a
   console/error-log check on an affected site to tell which.
+- **Interactive sign-in (`Invoke-SPOGovernanceAnalyzer-Interactive.ps1`) doesn't fully work
+  yet** — reported as still broken end-to-end. Not yet root-caused or reproduced with a live
+  tenant in this environment; the per-tenant app registration flow (`Get-InteractiveClientId`
+  / `Register-PnPEntraIDAppForInteractiveLogin`) is the most likely area, since it's the part
+  that could never be verified against a real Entra ID tenant. Needs the actual console
+  output/error from a failed run to diagnose further.
 
 ## Roadmap / Ideas
+
+- **Multi-tenant support** — both scripts currently target one tenant per run (one
+  `config.json` / one tenant name prompt). Running the same scan across several tenants
+  means invoking the script repeatedly by hand. Could add a tenant list input (CSV/JSON) and
+  loop the existing per-tenant scan logic, with per-tenant output subfolders.
 
 - **Expand Microsoft 365 Group owners/members** — the security-group expansion feature only
   resolves groups found as SharePoint permission holders. The M365 Group behind a

@@ -11,11 +11,12 @@ mockup/
 .claude/
 
 # History data — local trend data, regenerated on each machine
-history.jsonl
+history/
 
 # Credentials — store in %USERPROFILE%\.spo-tools\config.json instead
-config/config.json
-config/*.pfx
+# Only config.example.json is tracked; all other config files stay local
+config/*
+!config/config.example.json
 
 # Logs
 logs/

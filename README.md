@@ -178,7 +178,7 @@ HTML report's expandable per-site permission table.
 
 ## History & Trend Data
 
-Each run appends one JSON line to `history.jsonl` in the script folder. On subsequent runs the HTML report shows:
+Each run appends one JSON line to `history\history.jsonl`. On subsequent runs the HTML report shows:
 
 - **Change badges** (▲/▼ with green/red colouring) showing the delta from the previous run
 - History is capped at 365 entries (approximately one year of daily runs)
@@ -193,6 +193,7 @@ See [ROADMAP.md](ROADMAP.md) for known issues and planned work not yet actioned.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.37 | 2026-08-06 | Moved `history.jsonl` into its own `history\` subfolder (was a bare file at the script root) — matches the `output\` / `config\` folder convention and lets `.gitignore` exclude the whole folder. |
 | v1.0.36 | 2026-08-04 | Removed the KPI card sparkline trend lines — with only a handful of history points and aggressive min/max auto-scaling, a run-to-run swing (e.g. a differently-scoped scan) rendered as a sharp, misleading spike. Change badges (▲/▼ vs. previous run) are unaffected. |
 | v1.0.35 | 2026-08-04 | Wrapped the sensitivity label cache fetch (`Get-PnPAvailableSensitivityLabel`) in the existing retry helper (3 attempts) to shrug off a transient Graph `500 Internal Server Error` seen on a real tenant with published label policies — not a permissions or cmdlet issue. |
 | v1.0.34 | 2026-08-04 | Fixed the KPI summary grid stranding its 7th card (Teams-connected) alone on its own row at ~1/6 width. Switched to `repeat(auto-fit,minmax(...,1fr))` so a lone last-row card fills the full width instead. |
@@ -209,6 +210,7 @@ See [ROADMAP.md](ROADMAP.md) for known issues and planned work not yet actioned.
 
 | Version | Date | Notes |
 |---------|------|-------|
+| v1.0.8 | 2026-08-06 | Same `history.jsonl` folder move as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.37. |
 | v1.0.7 | 2026-08-04 | Same sparkline removal as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.36. |
 | v1.0.6 | 2026-08-04 | Same retry wrap as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.35 for `Get-PnPAvailableSensitivityLabel`. |
 | v1.0.5 | 2026-08-04 | Same KPI summary grid fix as `Invoke-SPOGovernanceAnalyzer.ps1` v1.0.34. |
